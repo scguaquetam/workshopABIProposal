@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+/* Brand fonts copied from dao-frontend (public/fonts) */
+@font-face {
+  font-family: 'KK-Topo';
+  src: url('/fonts/KK-Topo-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Sora';
+  src: url('/fonts/Sora.ttf') format('truetype');
+  font-weight: 100 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Rootstock-Sans';
+  src: url('/fonts/Rootstock-Sans-Body.otf') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@theme {
+  /* Tokens mirrored from dao-frontend src/theme/default.css */
+  --font-sans: 'Rootstock-Sans', 'Open Sans', system-ui, sans-serif;
+  --font-sora: 'Sora', sans-serif;
+  --font-kk-topo: 'KK-Topo', sans-serif;
+
+  --color-bg-100: #171412;
+  --color-bg-80: #25211e;
+  --color-bg-60: #37322f;
+  --color-bg-40: #66605c;
+  --color-bg-20: #9a948d;
+  --color-bg-0: #aca39d;
+
+  --color-text-100: #ffffff;
+  --color-text-80: #e4e1da;
+  --color-text-60: #d4cfc4;
+  --color-text-40: #9a948d;
+  --color-text-20: #37322f;
+
+  --color-primary: #f47a2a;
+  --color-success: #1bc47d;
+  --color-error: #ff6688;
+  --color-warning: #deff1a;
+
+  --color-rif-blue: #4b5cf0;
+  --color-rsk-purple: #9e76ff;
+  --color-rsk-pink: #ff71e1;
+  --color-rsk-lime: #deff1a;
+
+  /* Tier palette (board chart + badges) */
+  --color-tier-a: #f7931a;
+  --color-tier-b: #e8500a;
+  --color-tier-c: #7a3209;
+}
+
+body {
+  background-color: var(--color-bg-100);
+  color: var(--color-text-100);
+  font-family: var(--font-sans);
+}
+
+/* RIF price slider, styled to match the dApp's orange accent */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-bg-60);
+  outline: none;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid #171412;
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid #171412;
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
