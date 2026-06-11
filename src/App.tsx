@@ -3,9 +3,10 @@ import { useState } from 'react'
 
 import { BoardDashboard } from './components/BoardDashboard'
 import { MyRewardsReplica } from './components/myrewards/MyRewardsReplica'
+import { SchemaView } from './components/SchemaView'
 import { RootstockLogo } from './components/shared'
 
-const TABS = ['Spend Dashboard', 'My Rewards'] as const
+const TABS = ['Spend Dashboard', 'My Rewards', 'DB Schema'] as const
 type Tab = (typeof TABS)[number]
 
 const App = () => {
@@ -50,12 +51,12 @@ const App = () => {
       </div>
 
       <main className="flex-1 w-full">
-        {activeTab === 'Spend Dashboard' ? (
-          <div className="max-w-6xl mx-auto px-6 py-10 w-full">
-            <BoardDashboard />
-          </div>
-        ) : (
+        {activeTab === 'My Rewards' ? (
           <MyRewardsReplica />
+        ) : (
+          <div className="max-w-6xl mx-auto px-6 py-10 w-full">
+            {activeTab === 'Spend Dashboard' ? <BoardDashboard /> : <SchemaView />}
+          </div>
         )}
       </main>
 

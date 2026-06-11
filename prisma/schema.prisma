@@ -1,0 +1,140 @@
+// Tiered Rewards — observation layer schema (Pieza 03 of the sandbox brief).
+//
+// No rewards logic lives here yet: these tables capture stake/unstake events and
+// enrich them with the tier (derived from staker age), ABI and cost, so they can
+// feed both the staker UI and the board spend dashboard.
+//
+// Conventions follow dao-frontend/prisma/schema.prisma (Postgres, dao_data schema,
+// varchar(42) addresses, timestamptz).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DAO_DATA_DB_CONNECTION_STRING")
+  schemas  = ["dao_data"]
+}
+
+/// Bucket by staker age: A = day 0-60, B = day 61-180, C = day 181+.
+/// Rates are being tested — currently 28 / 17 / 8.
+enum Tier {
+  A
+  B
+  C
+
+  @@schema("dao_data")
+}
+
+enum WalletStatus {
+  active
+  unstaked
+  restaked
+
+  @@schema("dao_data")
+}
+
+enum StakeEventType {
+  stake
+  unstake
+  allocate
+
+  @@schema("dao_data")
+}
+
+/// One row per wallet, locked at first stake. The cohort clock NEVER resets:
+/// if a wallet unstakes and comes back, firstStakeTs stays the same (anti-gaming).
+model WalletRegistry {
+  walletAddress String       @id @db.VarChar(42)
+  /// Immutable. Defines the staker-age clock and therefore the tier.
+  firstStakeTs  DateTime     @db.Timestamptz()
+  /// Denormalized convenience, refreshed by a daily job.
+  /// Always derivable as f(now - firstStakeTs): 0-60d -> A, 61-180d -> B, 181+d -> C.
+  currentTier   Tier
+  status        WalletStatus @default(active)
+  createdAt     DateTime     @default(now()) @db.Timestamptz()
+  updatedAt     DateTime     @updatedAt @db.Timestamptz()
+
+  stakeEvents StakeEvent[]
+  rewardsLog  RewardsActivityLog[]
+
+  @@index([currentTier], map: "idx_wallet_registry_current_tier")
+  @@index([firstStakeTs], map: "idx_wallet_registry_first_stake_ts")
+  @@map("wallet_registry")
+  @@schema("dao_data")
+}
+
+/// Raw on-chain event log — append-only audit trail of every stake/unstake/allocate.
+model StakeEvent {
+  txHash        String         @id @db.VarChar(66)
+  walletAddress String         @db.VarChar(42)
+  eventType     StakeEventType
+  /// Token amount of the event (stRIF), 18 decimals.
+  amount        Decimal        @db.Decimal(38, 18)
+  blockNumber   BigInt
+  /// On-chain time.
+  blockTs       DateTime       @db.Timestamptz()
+  ingestedAt    DateTime       @default(now()) @db.Timestamptz()
+
+  wallet WalletRegistry @relation(fields: [walletAddress], references: [walletAddress])
+
+  @@index([walletAddress, blockTs], map: "idx_stake_events_wallet_block_ts")
+  @@index([eventType], map: "idx_stake_events_event_type")
+  @@map("stake_events")
+  @@schema("dao_data")
+}
+
+/// One row per wallet per (bi-weekly) cycle: the wallet's tier, ABI and cost
+/// at that point in time. Pure observation — written by the indexer, never recomputed.
+model RewardsActivityLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  walletAddress String   @db.VarChar(42)
+  /// Cycle identifier, e.g. "2026-C11" (bi-weekly).
+  cycle         String   @db.VarChar(16)
+  /// Average stRIF allocated during the cycle.
+  strifAllocated Decimal @db.Decimal(38, 18)
+  /// Tier in force for this wallet during this cycle.
+  tier          Tier
+  /// 28 / 17 / 8 according to tier (snapshot — rates may change while testing).
+  abiPct        Decimal  @db.Decimal(5, 2)
+  /// strifAllocated * abiPct / 12, expressed in RIF.
+  rewardRif     Decimal  @db.Decimal(38, 18)
+  /// RIF price at the time of the cycle.
+  rifPrice      Decimal  @db.Decimal(18, 8)
+  /// rewardRif * rifPrice.
+  costUsd       Decimal  @db.Decimal(18, 2)
+  createdAt     DateTime @default(now()) @db.Timestamptz()
+
+  wallet WalletRegistry @relation(fields: [walletAddress], references: [walletAddress])
+
+  @@unique([walletAddress, cycle], map: "unique_wallet_cycle")
+  @@index([cycle, tier], map: "idx_rewards_activity_log_cycle_tier")
+  @@map("rewards_activity_log")
+  @@schema("dao_data")
+}
+
+/// Monthly aggregate per bucket for the board dashboard: staker count, stRIF and
+/// cost per bucket per month. Materialized from rewards_activity_log +
+/// wallet_registry by a monthly job — kept as a table so board queries stay cheap
+/// and historical snapshots survive rate changes.
+model BucketMonthlyStats {
+  id           String   @id @default(uuid()) @db.Uuid
+  /// First day of the month, e.g. 2026-05-01.
+  month        DateTime @db.Date
+  tier         Tier
+  /// Number of distinct active stakers in this bucket during the month.
+  stakersCount Int
+  /// Total stRIF sitting in this bucket (monthly average).
+  strifTotal   Decimal  @db.Decimal(38, 18)
+  /// Sum of rewardRif for the bucket's wallets over the month.
+  costRif      Decimal  @db.Decimal(38, 18)
+  /// Sum of costUsd for the bucket's wallets over the month.
+  costUsd      Decimal  @db.Decimal(18, 2)
+  computedAt   DateTime @default(now()) @db.Timestamptz()
+
+  @@unique([month, tier], map: "unique_month_tier")
+  @@index([month], map: "idx_bucket_monthly_stats_month")
+  @@map("bucket_monthly_stats")
+  @@schema("dao_data")
+}
